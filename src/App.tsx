@@ -1,37 +1,23 @@
 import styles from "./app.module.css";
 import { useEffect, useState } from "react";
-import { WORDS, Challenge } from "./utils/words";
 
-import { Header } from "./components/Header";
+import { Challenge, WORDS } from "./utils/words";
+
 import { Tip } from "./components/Tip";
-import { Letter } from "./components/Letter";
 import { Input } from "./components/Input";
+import { Header } from "./components/Header";
+import { Letter } from "./components/Letter";
 import { Button } from "./components/Button";
-import { LettersUsed, LettersUsedProps } from "./components/LettersUsed";
+import { Loading } from "./components/Loading";
+import { LettersUsedProps, LettersUsed } from "./components/LettersUsed";
+
 export default function App() {
   const [score, setScore] = useState(0);
   const [letter, setLetter] = useState("");
-  const [lettersUsed, setLettersUsed] = useState<LettersUsedProps[]>([]);
+  const [guesses, setGuesses] = useState<LettersUsedProps[]>([]);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
-  const ATTEMPTS_MARGIN = 5;
 
-  function handleRestartGame() {
-    const isConfirmed = window.confirm("Você tem certeza que deseja reinciar?");
-    if (isConfirmed) {
-      startGame();
-    }
-  }
-
-  function startGame() {
-    const index = Math.floor(Math.random() * WORDS.length);
-    const randomWord = WORDS[index];
-
-    setChallenge(randomWord);
-
-    setScore(0);
-    setLetter("");
-    setLettersUsed([]);
-  }
+  const ATTEMPT_LIMIT = 10;
 
   function handleConfirm() {
     if (!challenge) {
@@ -39,17 +25,14 @@ export default function App() {
     }
 
     if (!letter.trim()) {
-      return alert("Digite uma letra");
+      return alert("Digite uma letra!");
     }
 
     const value = letter.toUpperCase();
-    const exists = lettersUsed.find(
-      (used) => used.value.toUpperCase() === value
-    );
+    const exists = guesses.find((guess) => guess.value === value);
 
     if (exists) {
-      setLetter("");
-      return alert("Letra já utilizada");
+      return alert("Você já utilizou a letra " + value);
     }
 
     const hits = challenge.word
@@ -60,10 +43,31 @@ export default function App() {
     const correct = hits > 0;
     const currentScore = score + hits;
 
-    setLettersUsed((prevState) => [...prevState, { value, correct }]);
+    setGuesses((prevState) => [...prevState, { value, correct }]);
     setScore(currentScore);
 
     setLetter("");
+  }
+
+  function startGame() {
+    const index = Math.floor(Math.random() * WORDS.length);
+    const randomWord = WORDS[index];
+
+    setChallenge(randomWord);
+
+    setScore(0);
+    setLetter("");
+    setGuesses([]);
+  }
+
+  function handleRestartGame() {
+    const isConfirmed = window.confirm(
+      "Você tem certeza que deseja reiniciar?"
+    );
+
+    if (isConfirmed) {
+      startGame();
+    }
   }
 
   function endGame(message: string) {
@@ -75,30 +79,29 @@ export default function App() {
     startGame();
   }, []);
 
-  useEffect(() => {}, [score, lettersUsed.length]);
-
-  setTimeout(() => {
-    if (score === challenge?.word.length) {
-      return endGame("Parabéns você descobriu a palavra!");
+  useEffect(() => {
+    if (!challenge) {
+      return;
     }
-
-    const attemptLimit = challenge?.word.length + ATTEMPTS_MARGIN;
-
-    if (lettersUsed.length === attemptLimit) {
-      return endGame("Você excedeu o limite de tentativas!");
-    }
-  }, 300);
+    setTimeout(() => {
+      if (score === challenge.word.length) {
+        return endGame("Parabéns, você descobriu a palavra!");
+      } else if (guesses.length === ATTEMPT_LIMIT) {
+        return endGame("Que pena, você usou todas as tentativas!");
+      }
+    }, 200);
+  }, [score, guesses.length]);
 
   if (!challenge) {
-    return;
+    return <Loading />;
   }
 
   return (
     <div className={styles.container}>
       <main>
         <Header
-          current={lettersUsed.length}
-          max={challenge.word.length + ATTEMPTS_MARGIN}
+          max={ATTEMPT_LIMIT}
+          current={guesses.length}
           onRestart={handleRestartGame}
         />
 
@@ -106,33 +109,35 @@ export default function App() {
 
         <div className={styles.word}>
           {challenge.word.split("").map((letter, index) => {
-            const letterUsed = lettersUsed.find(
-              (used) => used.value.toUpperCase() === letter.toUpperCase()
+            const guess = guesses.find(
+              (guess) => guess.value.toUpperCase() === letter.toUpperCase()
             );
 
             return (
               <Letter
                 key={index}
-                value={letterUsed?.value}
-                color={letterUsed?.correct ? "correct" : "default"}
+                value={guess?.value}
+                color={guess?.correct ? "correct" : "default"}
               />
             );
           })}
         </div>
+
         <h4>Palpite</h4>
 
         <div className={styles.guess}>
           <Input
             autoFocus
             maxLength={1}
-            placeholder="?"
             value={letter}
+            placeholder="?"
             onChange={(e) => setLetter(e.target.value)}
           />
+
           <Button title="Confirmar" onClick={handleConfirm} />
         </div>
 
-        <LettersUsed data={lettersUsed} />
+        <LettersUsed data={guesses} />
       </main>
     </div>
   );
